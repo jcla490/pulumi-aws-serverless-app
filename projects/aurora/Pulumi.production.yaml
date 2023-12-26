@@ -1,7 +1,10 @@
 # Change this config to fit your needs
 config:
   aws:region: us-east-2
-  ecs_fargate:container_insights: enabled
-  ecs_fargate:fargate_base: 1
-  ecs_fargate:fargate_weight: 100
-  ecs_fargate:fargate_spot_weight: 100
+  aurora:engine_version: 14.6
+  aurora:backup_retention_period: 7
+  aurora:max_capacity: 16 # default
+  aurora:min_capacity: 0.5
+  aurora:instance_count: 2
+  aurora:performance_insights_enabled: true
+  aurora:performance_insights_retention_period: 7

@@ -1,12 +1,13 @@
 """
-ecs_fargate
+aurora
 
-Creates an ECS cluster on AWS Fargate
+Creates a serverless Aurora Postgres cluster
 """
 import os
 
 import pulumi
 import pulumi_aws as aws
+import pulumi_random as random
 
 # ---------------------------------------------------------------------------------------
 # Project config
@@ -18,77 +19,89 @@ TAGS = {
     "project": PROJECT_NAME,
 }
 
-SERVICE_CONNECT_NAMESPACE_NAME = "mycoolapp"
-SERVICE_CONNECT_NAMESPACE_DESCRIPTION = (
-    f"Services supporting {SERVICE_CONNECT_NAMESPACE_NAME}"
-)
+DB_IDENTIFIER = "mycoolapp"
+DB_USERNAME = "db_admin"
 
 # Stack references
 vpc = pulumi.StackReference(f"{os.getenv('ORG_NAME')}/vpc/{STACK}")
 vpc_id = vpc.require_output("vpc_id")
-public_subnet_ids = vpc.require_output("public_subnet_ids")
+private_subnet_ids = vpc.require_output("private_subnet_ids")
 
 # Environment specific config
 CONFIG = pulumi.Config()
-container_insights = CONFIG.require("container_insights")
-fargate_base = CONFIG.require_int("fargate_base")
-fargate_weight = CONFIG.require_int("fargate_weight")
-fargate_spot_weight = CONFIG.require_int("fargate_spot_weight")
-
-# ---------------------------------------------------------------------------------------
-# service connect namespace
-# https://www.pulumi.com/registry/packages/aws/api-docs/servicediscovery/httpnamespace/
-# ---------------------------------------------------------------------------------------
-service_connect_namespace = aws.servicediscovery.PrivateDnsNamespace(
-    "service-connect-namespace",
-    name=SERVICE_CONNECT_NAMESPACE_NAME,
-    description=SERVICE_CONNECT_NAMESPACE_DESCRIPTION,
-    vpc=vpc_id,
-    tags=TAGS,
+engine_version = CONFIG.require("engine_version")
+backup_retention_period = CONFIG.require_int("backup_retention_period")
+min_capacity = CONFIG.require("min_capacity")
+max_capacity = CONFIG.require("max_capacity")
+instance_count = CONFIG.require_int("instance_count")
+performance_insights_enabled = CONFIG.require_bool("performance_insights_enabled")
+performance_insights_retention_period = CONFIG.require_int(
+    "performance_insights_retention_period"
 )
 
 # ---------------------------------------------------------------------------------------
-# ecs cluster
-# https://www.pulumi.com/registry/packages/aws/api-docs/ecs/cluster/
+# aurora cluster
+# https://www.pulumi.com/registry/packages/aws/api-docs/rds/cluster/
 # ---------------------------------------------------------------------------------------
-cluster = aws.ecs.Cluster(
-    "ecs-cluster",
-    name=f"cluster-{STACK}",
-    settings=[
-        aws.ecs.ClusterSettingArgs(
-            name="containerInsights",
-            value=container_insights,
-        )
-    ],
-    service_connect_defaults=aws.ecs.ClusterServiceConnectDefaultsArgs(
-        namespace=service_connect_namespace.arn
+# Create a database password
+db_password = random.RandomPassword("db-password", length=32, special=True)
+
+# Associate VPC private subnets with database
+db_subnet_group = aws.rds.SubnetGroup(
+    "db-subnet-group", subnet_ids=private_subnet_ids, tags=TAGS
+)
+
+# Cluster creation
+aurora_cluster = aws.rds.Cluster(
+    "aurora-cluster",
+    apply_immediately=True,
+    cluster_identifier=f"{DB_IDENTIFIER}-cluster",
+    engine="aurora-postgresql",
+    engine_mode="provisioned",
+    engine_version=engine_version,
+    db_subnet_group_name=db_subnet_group.name,
+    database_name=DB_IDENTIFIER,
+    master_username=DB_USERNAME,
+    master_password=db_password.result,
+    backup_retention_period=backup_retention_period,
+    serverlessv2_scaling_configuration=aws.rds.ClusterServerlessv2ScalingConfigurationArgs(
+        min_capacity=min_capacity,
+        max_capacity=max_capacity,
     ),
+    copy_tags_to_snapshot=True,
+    preferred_backup_window="04:00-06:00",
+    preferred_maintenance_window="sun:02:00-sun:04:00",
+    skip_final_snapshot=False,
+    final_snapshot_identifier=f"{DB_IDENTIFIER}-db-final-snapshot",
     tags=TAGS,
 )
 
-# ---------------------------------------------------------------------------------------
-# cluster capacity providers
-# https://www.pulumi.com/registry/packages/aws/api-docs/ecs/clustercapacityproviders/
-# This configuration allows for some cost savings by provisioning capacity as follows:
-# for a given task, first create 1 instance of it on FARGATE, then for every 1 FARGATE
-# instance, create up to 4 FARGATE_SPOT instances as more capacity is needed
-# ---------------------------------------------------------------------------------------
-cluster_capacity_providers = aws.ecs.ClusterCapacityProviders(
-    "cluster-capacity-providers",
-    cluster_name=cluster.name,
-    capacity_providers=["FARGATE", "FARGATE_SPOT"],
-    default_capacity_provider_strategies=[
-        aws.ecs.ClusterCapacityProvidersDefaultCapacityProviderStrategyArgs(
-            base=fargate_base,
-            weight=fargate_weight,
-            capacity_provider="FARGATE",
-        ),
-        aws.ecs.ClusterCapacityProvidersDefaultCapacityProviderStrategyArgs(
-            weight=fargate_spot_weight,
-            capacity_provider="FARGATE_SPOT",
-        ),
-    ],
-)
+# Instance creation
+for i in range(instance_count):
+    aurora_instance = aws.rds.ClusterInstance(
+        f"cluster-instance-{i}",
+        identifier=f"{DB_IDENTIFIER}-{i}",
+        cluster_identifier=aurora_cluster.id,
+        instance_class="db.serverless",
+        engine=aurora_cluster.engine,
+        engine_version=aurora_cluster.engine_version,
+        performance_insights_enabled=performance_insights_enabled,
+        performance_insights_retention_period=performance_insights_retention_period
+        if performance_insights_enabled
+        else None,
+        tags=TAGS,
+    )
 
-pulumi.export("cluster_arn", cluster.arn)
-pulumi.export("service_namespace_arn", service_connect_namespace.arn)
+# Database credentials
+db_credentials_payload = {
+    "cluster_identifier": f"{DB_IDENTIFIER}-cluster",
+    "database_name": DB_IDENTIFIER,
+    "writer_endpoint": aurora_cluster.endpoint,
+    "reader_endpoint": aurora_cluster.reader_endpoint,
+    "username": DB_USERNAME,
+    "password": db_password.result,
+    "engine": "postgres",
+    "port": 5432,
+}
+
+pulumi.export(f"{DB_IDENTIFIER}_database_credentials", db_credentials_payload)

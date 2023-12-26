@@ -1,4 +1,4 @@
-name: ecs_fargate
-description: An ECS cluster on AWS Fargate
+name: aurora
+description: An Aurora Postgres cluster
 runtime:
   name: python

@@ -1,0 +1,4 @@
+name: ecs
+description: An ECS cluster on AWS Fargate
+runtime:
+  name: python

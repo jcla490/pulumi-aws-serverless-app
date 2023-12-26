@@ -1,0 +1,7 @@
+# Change this config to fit your needs
+config:
+  aws:region: us-east-2
+  ecs_fargate:container_insights: enabled
+  ecs_fargate:fargate_base: 1
+  ecs_fargate:fargate_weight: 100
+  ecs_fargate:fargate_spot_weight: 100

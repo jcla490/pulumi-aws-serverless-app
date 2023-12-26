@@ -1,12 +1,13 @@
-# pulumi-aws-bootstrap
+# pulumi-aws-serverless-bootstrap
 
-This repo is a collection of Pulumi projects for deploying common AWS resources.
+This repo is a collection of Pulumi projects for deploying common AWS `serverless` resources.
 
 ## Developer setup
 
-## Projects 
+## Projects
 
 | Project 	                            | Description 	                     |
 |--------------------------------------	|----------------------------------- |
 | [vpc](projects/vpc)                   | A typical VPC            	         |
-| [ecs_fargate](projects/ecs_fargate)   | An ECS cluster on AWS Fargate      |
+| [ecs](projects/ecs)                   | ECS cluster on AWS Fargate         |
+| [aurora](projects/aurora/)            | Aurora Serverless v2 Postgres DB   |

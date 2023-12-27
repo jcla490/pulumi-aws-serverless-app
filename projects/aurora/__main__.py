@@ -3,6 +3,7 @@ aurora
 
 Creates a serverless Aurora Postgres cluster
 """
+import json
 import os
 
 import pulumi
@@ -93,15 +94,31 @@ for i in range(instance_count):
     )
 
 # Database credentials
-db_credentials_payload = {
-    "cluster_identifier": f"{DB_IDENTIFIER}-cluster",
-    "database_name": DB_IDENTIFIER,
-    "writer_endpoint": aurora_cluster.endpoint,
-    "reader_endpoint": aurora_cluster.reader_endpoint,
-    "username": DB_USERNAME,
-    "password": db_password.result,
-    "engine": "postgres",
-    "port": 5432,
-}
+db_credentials_payload = pulumi.Output.all(
+    aurora_cluster.endpoint, aurora_cluster.reader_endpoint, db_password.result
+).apply(
+    lambda args: json.dumps(
+        {
+            "cluster_identifier": f"{DB_IDENTIFIER}-cluster",
+            "database_name": DB_IDENTIFIER,
+            "writer_endpoint": args[0],
+            "reader_endpoint": args[1],
+            "username": DB_USERNAME,
+            "password": args[2],
+            "engine": "postgres",
+            "port": 5432,
+        }
+    )
+)
 
-pulumi.export(f"{DB_IDENTIFIER}_database_credentials", db_credentials_payload)
+db_creds_secret = aws.secretsmanager.Secret(
+    "database-credentials-secret", name=f"{DB_IDENTIFIER}-db-credentials"
+)
+
+db_creds_secret_version = aws.secretsmanager.SecretVersion(
+    "database-credentials-secret-version",
+    secret_id=db_creds_secret.id,
+    secret_string=db_credentials_payload,
+)
+
+pulumi.export(f"{DB_IDENTIFIER}_database_credentials_secret_arn", db_creds_secret.arn)

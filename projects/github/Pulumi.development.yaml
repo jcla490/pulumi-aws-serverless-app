@@ -1,0 +1,6 @@
+# Change this config to fit your needs
+config:
+  aws:region: us-east-2
+  github:owner: jcla490 # set to your org
+  github:token: # generate your own access token
+    secure: AAABAOS6toHihRkg+mOFGDKBzbv7rnFGxtar7Wpl8cMRhhM/YOxNeOVqZOMh5xZ7gkGGYai6bFJPSnbja5rS1i6KOr7kBASmnIO2T2UYnsB3BlAzjLoDkl/v2rq6SRt/lxmjDNK1vKSS879EjwEfB+Jv+hPhw151CxU5GMQ=

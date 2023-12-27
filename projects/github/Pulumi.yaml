@@ -1,0 +1,4 @@
+name: github
+description: GitHub Actions OIDC provider/role for AWS
+runtime:
+  name: python

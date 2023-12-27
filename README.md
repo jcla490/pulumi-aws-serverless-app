@@ -8,6 +8,7 @@ This repo is a collection of Pulumi projects for deploying common AWS `serverles
 
 | Project 	                            | Description 	                     |
 |--------------------------------------	|----------------------------------- |
-| [vpc](projects/vpc)                   | A typical VPC            	         |
-| [ecs](projects/ecs)                   | ECS cluster on AWS Fargate         |
 | [aurora](projects/aurora/)            | Aurora Serverless v2 Postgres DB   |
+| [ecs](projects/ecs)                   | ECS cluster on AWS Fargate         |
+| [github](projects/github)             | GitHub Actions AWS role/provider   |
+| [vpc](projects/vpc)                   | A typical VPC            	         |

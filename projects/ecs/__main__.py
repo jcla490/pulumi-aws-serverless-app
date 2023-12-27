@@ -58,7 +58,9 @@ cluster = aws.ecs.Cluster(
             name="containerInsights",
             value=container_insights,
         )
-    ],
+    ]
+    if container_insights
+    else None,
     service_connect_defaults=aws.ecs.ClusterServiceConnectDefaultsArgs(
         namespace=service_connect_namespace.arn
     ),

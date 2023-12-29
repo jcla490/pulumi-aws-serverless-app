@@ -1,0 +1,5 @@
+# Change this config to fit your needs
+config:
+  aws:region: us-east-2
+  certificates:domain: orangejuice.reviews
+  certificates:hosted_zone_id: Z03240491ASTTIPAESTPA

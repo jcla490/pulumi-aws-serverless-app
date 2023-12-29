@@ -20,7 +20,7 @@ TAGS = {
     "project": PROJECT_NAME,
 }
 
-DB_IDENTIFIER = "mycoolapp"
+DB_IDENTIFIER = "orangejuicedb"
 DB_USERNAME = "db_admin"
 
 # Stack references
@@ -73,7 +73,7 @@ aurora_cluster = aws.rds.Cluster(
     preferred_backup_window="04:00-06:00",
     preferred_maintenance_window="sun:02:00-sun:04:00",
     skip_final_snapshot=False,
-    final_snapshot_identifier=f"{DB_IDENTIFIER}-db-final-snapshot",
+    final_snapshot_identifier=f"{DB_IDENTIFIER}-final-snapshot",
     tags=TAGS,
 )
 
@@ -112,7 +112,7 @@ db_credentials_payload = pulumi.Output.all(
 )
 
 db_creds_secret = aws.secretsmanager.Secret(
-    "database-credentials-secret", name=f"{DB_IDENTIFIER}-db-credentials"
+    "database-credentials-secret", name=f"{DB_IDENTIFIER}-credentials"
 )
 
 db_creds_secret_version = aws.secretsmanager.SecretVersion(
@@ -121,4 +121,4 @@ db_creds_secret_version = aws.secretsmanager.SecretVersion(
     secret_string=db_credentials_payload,
 )
 
-pulumi.export(f"{DB_IDENTIFIER}_database_credentials_secret_arn", db_creds_secret.arn)
+pulumi.export(f"{DB_IDENTIFIER}_credentials_secret_arn", db_creds_secret.arn)

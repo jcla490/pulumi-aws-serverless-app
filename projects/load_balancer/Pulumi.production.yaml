@@ -1,0 +1,5 @@
+# Change this config to fit your needs
+config:
+  aws:region: us-east-2
+  load_balancer:domain: orangejuice.reviews
+  load_balancer:hosted_zone_id: Z03240491ASTTIPAESTPA

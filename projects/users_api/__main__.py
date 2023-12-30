@@ -19,14 +19,25 @@ TAGS = {
     "environment": STACK,
     "project": PROJECT_NAME,
 }
+AWS_REGION = aws.get_region().name
 
 # Stack references
 vpc = pulumi.StackReference(f"{os.getenv('ORG_NAME')}/vpc/{STACK}")
 vpc_id = vpc.require_output("vpc_id")
+public_subnet_ids = vpc.require_output("public_subnet_ids")
 
-ecs = pulumi.StackReference(f"{os.getenv('ORG_NAME')}/ecs_fargate/{STACK}")
+ecs = pulumi.StackReference(f"{os.getenv('ORG_NAME')}/ecs/{STACK}")
 cluster_arn = ecs.require_output("cluster_arn")
-lb_default_target_group = ecs.require_output("cluster_load_balancer_target_group")
+task_shared_security_group_id = ecs.require_output("task_shared_security_group_id")
+task_shared_execution_role_arn = ecs.require_output("task_shared_execution_role_arn")
+
+load_balancer = pulumi.StackReference(f"{os.getenv('ORG_NAME')}/load_balancer/{STACK}")
+target_group_arn = load_balancer.require_output("target_group_arn")
+
+aurora = pulumi.StackReference(f"{os.getenv('ORG_NAME')}/aurora/{STACK}")
+db_credentials_secret_arn = aurora.require_output(
+    "orangejuicedb_credentials_secret_arn"
+)
 
 # Environment specific config
 CONFIG = pulumi.Config()
@@ -70,56 +81,75 @@ app_image = awsx.ecr.Image(
 )
 
 # ---------------------------------------------------------------------------------------
-# ECS task
-# https://www.pulumi.com/registry/packages/awsx/api-docs/ecs/fargateservice
+# ECS task definition
+# https://www.pulumi.com/registry/packages/aws/api-docs/ecs/taskdefinition/
 # ---------------------------------------------------------------------------------------
-# Execution role for task
-task_execution_role = aws.iam.Role(
-    "task-execution-role",
-    assume_role_policy=json.dumps(
-        {
-            "Version": "2008-10-17",
-            "Statement": [
+task_definition = aws.ecs.TaskDefinition(
+    "task-definition",
+    container_definitions=pulumi.Output.all(
+        app_image.image_uri, db_credentials_secret_arn
+    ).apply(
+        lambda args: json.dumps(
+            [
                 {
-                    "Sid": "TaskAssumeRole",
-                    "Effect": "Allow",
-                    "Principal": {"Service": "ecs-tasks.amazonaws.com"},
-                    "Action": "sts:AssumeRole",
+                    "name": PROJECT_NAME,
+                    "image": args[0],
+                    "essential": True,
+                    "logConfiguration": {
+                        "logDriver": "awslogs",
+                        "options": {
+                            "awslogs-group": f"/ecs/{PROJECT_NAME}",
+                            "awslogs-region": AWS_REGION,
+                            "awslogs-stream-prefix": "ecs",
+                            "awslogs-create-group": "true",
+                        },
+                    },
+                    "secrets": [
+                        {
+                            "valueFrom": args[1],
+                            "name": "DATABASE_CREDENTIALS",
+                        }
+                    ],
+                    "portMappings": [{"containerPort": 80, "protocol": "tcp"}],
                 }
-            ],
-        }
+            ]
+        )
     ),
+    cpu=256,
+    memory=512,
+    execution_role_arn=task_shared_execution_role_arn,
+    family="users_api",
+    network_mode="awsvpc",
+    requires_compatibilities=["FARGATE"],
+    runtime_platform=aws.ecs.TaskDefinitionRuntimePlatformArgs(
+        cpu_architecture="X86_64", operating_system_family="LINUX"
+    ),
+    tags=TAGS,
 )
 
-rpa = aws.iam.RolePolicyAttachment(
-    "task-execution-rpa",
-    role=task_execution_role.name,
-    policy_arn="arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
-)
-
-# ECS task + service
-service = awsx.ecs.FargateService(
-    "fargate-service",
-    awsx.ecs.FargateServiceArgs(
-        name=PROJECT_NAME,
-        cluster=cluster_arn,
-        desired_count=1,
+# ---------------------------------------------------------------------------------------
+# ECS service
+# https://www.pulumi.com/registry/packages/aws/api-docs/ecs/service/
+# ---------------------------------------------------------------------------------------
+service = aws.ecs.Service(
+    "service",
+    name=PROJECT_NAME,
+    cluster=cluster_arn,
+    task_definition=task_definition.arn,
+    desired_count=2,
+    launch_type="FARGATE",
+    health_check_grace_period_seconds=60,
+    network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
+        subnets=public_subnet_ids,
         assign_public_ip=True,
-        task_definition_args=awsx.ecs.FargateServiceTaskDefinitionArgs(
-            task_role=task_execution_role,
-            container=awsx.ecs.TaskDefinitionContainerDefinitionArgs(
-                name=PROJECT_NAME,
-                cpu=2048,
-                memory=2048,
-                image=app_image.image_uri,
-                essential=True,
-                port_mappings=[
-                    awsx.ecs.TaskDefinitionPortMappingArgs(
-                        container_port=80,
-                        target_group=lb_default_target_group,
-                    )
-                ],
-            ),
-        ),
+        security_groups=[task_shared_security_group_id],
     ),
+    load_balancers=[
+        aws.ecs.ServiceLoadBalancerArgs(
+            target_group_arn=target_group_arn,
+            container_name=PROJECT_NAME,
+            container_port=80,
+        )
+    ],
+    tags=TAGS,
 )

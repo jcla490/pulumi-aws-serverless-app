@@ -31,6 +31,10 @@ CONFIG = pulumi.Config()
 domain_name = CONFIG.require("domain")
 hosted_zone_id = CONFIG.require("hosted_zone_id")
 
+# ---------------------------------------------------------------------------------------
+# application load balancer
+# https://www.pulumi.com/registry/packages/aws/api-docs/lb/loadbalancer/
+# ---------------------------------------------------------------------------------------
 security_group = aws.ec2.SecurityGroup(
     "load-balancer-security-group",
     description="Security group for application load balancer",
@@ -59,10 +63,6 @@ security_group = aws.ec2.SecurityGroup(
     ],
 )
 
-# ---------------------------------------------------------------------------------------
-# application load balancer
-# https://www.pulumi.com/registry/packages/aws/api-docs/lb/loadbalancer/
-# ---------------------------------------------------------------------------------------
 load_balancer = aws.lb.LoadBalancer(
     "load-balancer",
     internal=False,
@@ -78,7 +78,7 @@ target_group = aws.lb.TargetGroup(
     vpc_id=vpc_id,
     port=80,
     health_check=aws.lb.TargetGroupHealthCheckArgs(
-        matcher="200-302",
+        matcher="200-302", interval=300, path="/health"
     ),
     opts=pulumi.ResourceOptions(parent=load_balancer),
 )

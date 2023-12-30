@@ -22,6 +22,12 @@ DUMMY_USER_STORE: list[User] = [
 ]
 
 
+@get(path="/health")
+async def health_check() -> list[User]:
+    """Health check for load balancer to ping"""
+    return {"status": "ok"}
+
+
 @post(path="/user")
 async def create_user(data: User) -> User:
     """Create a user"""
@@ -62,4 +68,6 @@ async def delete_user(user_id: int) -> None:
     return None
 
 
-api = Litestar(route_handlers=[create_user, list_users, get_user, delete_user])
+api = Litestar(
+    route_handlers=[health_check, create_user, list_users, get_user, delete_user]
+)

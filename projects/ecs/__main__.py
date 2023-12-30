@@ -3,6 +3,7 @@ ecs
 
 Creates an ECS cluster on AWS Fargate
 """
+import json
 import os
 
 import pulumi
@@ -26,6 +27,11 @@ SERVICE_CONNECT_NAMESPACE_DESCRIPTION = (
 # Stack references
 vpc = pulumi.StackReference(f"{os.getenv('ORG_NAME')}/vpc/{STACK}")
 vpc_id = vpc.require_output("vpc_id")
+
+aurora = pulumi.StackReference(f"{os.getenv('ORG_NAME')}/aurora/{STACK}")
+db_credentials_secret_arn = aurora.require_output(
+    "orangejuicedb_credentials_secret_arn"
+)
 
 # Environment specific config
 CONFIG = pulumi.Config()
@@ -91,5 +97,90 @@ cluster_capacity_providers = aws.ecs.ClusterCapacityProviders(
     ],
 )
 
+task_shared_security_group = aws.ec2.SecurityGroup(
+    "task-security-group",
+    description="Shared security group for tasks in this cluster",
+    vpc_id=vpc_id,
+    ingress=[
+        aws.ec2.SecurityGroupIngressArgs(
+            protocol="-1",
+            from_port=0,
+            to_port=0,
+            cidr_blocks=["0.0.0.0/0"],
+            ipv6_cidr_blocks=["::/0"],
+        ),
+    ],
+    egress=[
+        aws.ec2.SecurityGroupEgressArgs(
+            protocol="tcp",
+            from_port=0,
+            to_port=65535,
+            cidr_blocks=["0.0.0.0/0"],
+            ipv6_cidr_blocks=["::/0"],
+        )
+    ],
+)
+
+# Execution role for tasks
+# Allows any task that assumes this role to get Aurora DB creds and create/put log groups in Cloudwatch
+task_shared_execution_role = aws.iam.Role(
+    "task-execution-role",
+    assume_role_policy=json.dumps(
+        {
+            "Version": "2008-10-17",
+            "Statement": [
+                {
+                    "Sid": "TaskAssumeRole",
+                    "Effect": "Allow",
+                    "Principal": {"Service": "ecs-tasks.amazonaws.com"},
+                    "Action": "sts:AssumeRole",
+                }
+            ],
+        }
+    ),
+    inline_policies=[
+        aws.iam.RoleInlinePolicyArgs(
+            name="put-logs",
+            policy=json.dumps(
+                {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Action": ["logs:CreateLogGroup", "logs:PutLogEvents"],
+                            "Effect": "Allow",
+                            "Resource": "*",
+                        }
+                    ],
+                }
+            ),
+        ),
+        db_credentials_secret_arn.apply(
+            lambda arn: aws.iam.RoleInlinePolicyArgs(
+                name="get-db-secrets",
+                policy=json.dumps(
+                    {
+                        "Version": "2012-10-17",
+                        "Statement": [
+                            {
+                                "Action": ["secretsmanager:GetSecretValue"],
+                                "Effect": "Allow",
+                                "Resource": arn,
+                            }
+                        ],
+                    }
+                ),
+            ),
+        ),
+    ],
+)
+
+rpa = aws.iam.RolePolicyAttachment(
+    "task-execution-rpa",
+    role=task_shared_execution_role.name,
+    policy_arn="arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy",
+)
+
 pulumi.export("cluster_arn", cluster.arn)
 pulumi.export("service_namespace_arn", service_connect_namespace.arn)
+pulumi.export("task_shared_security_group_id", task_shared_security_group.id)
+pulumi.export("task_shared_execution_role_arn", task_shared_execution_role.arn)

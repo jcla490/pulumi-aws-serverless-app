@@ -99,14 +99,14 @@ db_credentials_payload = pulumi.Output.all(
 ).apply(
     lambda args: json.dumps(
         {
-            "cluster_identifier": f"{DB_IDENTIFIER}-cluster",
-            "database_name": DB_IDENTIFIER,
-            "writer_endpoint": args[0],
-            "reader_endpoint": args[1],
-            "username": DB_USERNAME,
-            "password": args[2],
-            "engine": "postgres",
-            "port": 5432,
+            "CLUSTER_IDENTIFIER": f"{DB_IDENTIFIER}-cluster",
+            "DATABASE_NAME": DB_IDENTIFIER,
+            "WRITER_ENDPOINT": args[0],
+            "READER_ENDPOINT": args[1],
+            "USERNAME": DB_USERNAME,
+            "PASSWORD": args[2],
+            "ENGINE": "postgres",
+            "PORT": 5432,
         }
     )
 )

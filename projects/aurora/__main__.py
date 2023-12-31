@@ -93,7 +93,7 @@ for i in range(instance_count):
         tags=TAGS,
     )
 
-# Database credentials
+# Database credentials secret
 db_credentials_payload = pulumi.Output.all(
     aurora_cluster.endpoint, aurora_cluster.reader_endpoint, db_password.result
 ).apply(

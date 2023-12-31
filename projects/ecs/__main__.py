@@ -97,6 +97,10 @@ cluster_capacity_providers = aws.ecs.ClusterCapacityProviders(
     ],
 )
 
+# ---------------------------------------------------------------------------------------
+# shared resources for tasks
+# ---------------------------------------------------------------------------------------
+# Task security group
 task_shared_security_group = aws.ec2.SecurityGroup(
     "task-security-group",
     description="Shared security group for tasks in this cluster",
@@ -121,8 +125,8 @@ task_shared_security_group = aws.ec2.SecurityGroup(
     ],
 )
 
-# Execution role for tasks
-# Allows any task that assumes this role to get Aurora DB creds and create/put log groups in Cloudwatch
+# Execution role
+# Allows any task that use this role to get Aurora DB creds and create/put cloudwatch logs
 task_shared_execution_role = aws.iam.Role(
     "task-execution-role",
     assume_role_policy=json.dumps(

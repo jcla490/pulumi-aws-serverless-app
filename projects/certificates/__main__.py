@@ -45,13 +45,11 @@ wildcard_validation_record = aws.route53.Record(
     opts=pulumi.ResourceOptions(parent=certificate),
 )
 
-validation_record_fqdns = [wildcard_validation_record.fqdn]
-
 # Validation object
 cert_validation = aws.acm.CertificateValidation(
     "domain-cert-validation",
     certificate_arn=certificate.arn,
-    validation_record_fqdns=validation_record_fqdns,
+    validation_record_fqdns=[wildcard_validation_record.fqdn],
     opts=pulumi.ResourceOptions(
         parent=certificate,
     ),

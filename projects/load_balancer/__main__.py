@@ -35,6 +35,7 @@ hosted_zone_id = CONFIG.require("hosted_zone_id")
 # application load balancer
 # https://www.pulumi.com/registry/packages/aws/api-docs/lb/loadbalancer/
 # ---------------------------------------------------------------------------------------
+# lb security group
 security_group = aws.ec2.SecurityGroup(
     "load-balancer-security-group",
     description="Security group for application load balancer",
@@ -63,6 +64,7 @@ security_group = aws.ec2.SecurityGroup(
     ],
 )
 
+# application load balancer
 load_balancer = aws.lb.LoadBalancer(
     "load-balancer",
     internal=False,
@@ -71,6 +73,7 @@ load_balancer = aws.lb.LoadBalancer(
     security_groups=[security_group.id],
 )
 
+# primary target group
 target_group = aws.lb.TargetGroup(
     "load-balancer-tg",
     protocol="HTTP",
@@ -115,6 +118,7 @@ https_listener = aws.lb.Listener(
     ],
 )
 
+# A record alias to load balancer
 load_balancer_record = aws.route53.Record(
     "load-balancer-a-record",
     zone_id=hosted_zone_id,

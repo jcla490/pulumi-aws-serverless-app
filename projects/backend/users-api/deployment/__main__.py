@@ -1,5 +1,5 @@
 """
-example_users_microservice
+users_api
 
 Creates ECS tasks and services for a basic CRUD users service
 """
@@ -76,7 +76,7 @@ aws.ecr.LifecyclePolicy(
 app_image = awsx.ecr.Image(
     "app-image",
     repository_url=image_repo.repository_url,
-    context="./api",
+    context="../",
     platform="linux/amd64",
 )
 

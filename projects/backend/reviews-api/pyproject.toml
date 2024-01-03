@@ -1,7 +1,7 @@
 [tool.poetry]
-name = "users-api"
+name = "reviews-api"
 version = "0.1.0"
-description = "A simple users service"
+description = "A simple reviews service"
 authors = ["jcla490 <jclark754@gmail.com>"]
 packages = [{ include = "api" }]
 

@@ -73,19 +73,6 @@ load_balancer = aws.lb.LoadBalancer(
     security_groups=[security_group.id],
 )
 
-# primary target group
-target_group = aws.lb.TargetGroup(
-    "load-balancer-tg",
-    protocol="HTTP",
-    target_type="ip",
-    vpc_id=vpc_id,
-    port=80,
-    health_check=aws.lb.TargetGroupHealthCheckArgs(
-        matcher="200-302", interval=300, path="/health"
-    ),
-    opts=pulumi.ResourceOptions(parent=load_balancer),
-)
-
 # Redirects to HTTPS
 http_listener = aws.lb.Listener(
     "http-listener",
@@ -112,8 +99,12 @@ https_listener = aws.lb.Listener(
     certificate_arn=root_domain_certificate_arn,
     default_actions=[
         aws.lb.ListenerDefaultActionArgs(
-            type="forward",
-            target_group_arn=target_group.arn,
+            type="fixed-response",
+            fixed_response=aws.lb.ListenerDefaultActionFixedResponseArgs(
+                content_type="text/plain",
+                message_body="Load balancer OK",
+                status_code="200",
+            ),
         )
     ],
 )
@@ -139,4 +130,3 @@ pulumi.export("load_balancer_zone_id", load_balancer.zone_id)
 pulumi.export("load_balancer_security_group_id", security_group.id)
 pulumi.export("http_listener_arn", http_listener.arn)
 pulumi.export("https_listener_arn", https_listener.arn)
-pulumi.export("target_group_arn", target_group.arn)

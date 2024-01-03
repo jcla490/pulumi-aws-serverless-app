@@ -1,12 +1,17 @@
 from contextlib import asynccontextmanager
-from typing import Any, Dict, Generator
+from typing import Any, Generator
 
 from db.tables import Users
-from fastapi import FastAPI, status
+from fastapi import APIRouter, FastAPI, status
 from piccolo.engine import engine_finder
 from piccolo_api.fastapi.endpoints import FastAPIKwargs, FastAPIWrapper, PiccoloCRUD
+from pydantic import BaseModel
+
+# Very important, load balancer/service will cry if not this path
+API_BASE_PATH = "/user"
 
 
+# These are startup and shutdown events called in our lifespan func
 async def open_database_connection_pool() -> None:
     try:
         engine = engine_finder()
@@ -23,6 +28,7 @@ async def close_database_connection_pool() -> None:
         print("Unable to connect to the database")
 
 
+# This is a lifespan event for the FastAPI instance
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> Generator[None, Any, None]:
     # Open db connection
@@ -32,24 +38,46 @@ async def lifespan(app: FastAPI) -> Generator[None, Any, None]:
     await close_database_connection_pool()
 
 
-api = FastAPI(lifespan=lifespan)
+# API init
+api = FastAPI(
+    title="User Service",
+    description="A basic users service for orangejuice.reviews",
+    openapi_url=API_BASE_PATH + "/openapi.json",
+    docs_url=API_BASE_PATH + "/docs",
+    redoc_url=API_BASE_PATH + "/redoc",
+    lifespan=lifespan,
+)
+
+# We only need the router to configure a new base path
+router = APIRouter(prefix=API_BASE_PATH)
 
 
-@api.get(
+class Health(BaseModel):
+    """A simple model for the health endpoint"""
+
+    status: str = "OK"
+
+
+@router.get(
     "/health",
     tags=["Health"],
-    response_description="Return HTTP Status Code 200 (OK)",
+    response_description="Return OK (200) if API is healthy",
+    response_model=Health,
     status_code=status.HTTP_200_OK,
 )
-def get_health() -> Dict[str, str]:
-    return {"status": "OK"}
+def get_health() -> Health:
+    """Health check for load balancer"""
+    return Health
 
 
+# A very convenient CRUD wrapper for our Users table
 FastAPIWrapper(
-    "/users",
-    fastapi_app=api,
+    "/",
+    fastapi_app=router,
     piccolo_crud=PiccoloCRUD(Users, read_only=False),
     fastapi_kwargs=FastAPIKwargs(
-        all_routes={"tags": ["Users"]},
+        all_routes={"tags": ["User"]},
     ),
 )
+
+api.include_router(router)

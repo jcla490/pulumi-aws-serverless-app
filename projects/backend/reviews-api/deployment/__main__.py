@@ -1,7 +1,7 @@
 """
-users_api
+reviews_api
 
-Creates ECS tasks and services for a basic CRUD users service
+Creates ECS tasks and services for a basic CRUD reviews service
 """
 import json
 import os
@@ -32,7 +32,7 @@ task_shared_security_group_id = ecs.require_output("task_shared_security_group_i
 task_shared_execution_role_arn = ecs.require_output("task_shared_execution_role_arn")
 
 load_balancer = pulumi.StackReference(f"{os.getenv('ORG_NAME')}/load_balancer/{STACK}")
-https_listener_arn = load_balancer.require_output("https_listener_arn")
+target_group_arn = load_balancer.require_output("target_group_arn")
 
 aurora = pulumi.StackReference(f"{os.getenv('ORG_NAME')}/aurora/{STACK}")
 db_credentials_secret_arn = aurora.require_output(
@@ -118,7 +118,7 @@ task_definition = aws.ecs.TaskDefinition(
     cpu=256,
     memory=512,
     execution_role_arn=task_shared_execution_role_arn,
-    family="users_api",
+    family="reviews_api",
     network_mode="awsvpc",
     requires_compatibilities=["FARGATE"],
     runtime_platform=aws.ecs.TaskDefinitionRuntimePlatformArgs(
@@ -127,38 +127,6 @@ task_definition = aws.ecs.TaskDefinition(
     tags=TAGS,
 )
 
-# primary target group
-target_group = aws.lb.TargetGroup(
-    "service-load-balancer-tg",
-    protocol="HTTP",
-    target_type="ip",
-    vpc_id=vpc_id,
-    port=80,
-    health_check=aws.lb.TargetGroupHealthCheckArgs(
-        matcher="200-302", interval=300, path="/user/health"
-    ),
-    opts=pulumi.ResourceOptions(parent=load_balancer),
-)
-
-# Forward action
-listerner_rule = aws.lb.ListenerRule(
-    "service-listener-rule",
-    listener_arn=https_listener_arn,
-    priority=100,
-    actions=[
-        aws.lb.ListenerRuleActionArgs(
-            type="forward",
-            target_group_arn=target_group.arn,
-        )
-    ],
-    conditions=[
-        aws.lb.ListenerRuleConditionArgs(
-            path_pattern=aws.lb.ListenerRuleConditionPathPatternArgs(
-                values=["/user/*"],
-            ),
-        )
-    ],
-)
 # ---------------------------------------------------------------------------------------
 # ECS service
 # https://www.pulumi.com/registry/packages/aws/api-docs/ecs/service/
@@ -168,7 +136,7 @@ service = aws.ecs.Service(
     name=PROJECT_NAME,
     cluster=cluster_arn,
     task_definition=task_definition.arn,
-    desired_count=1,
+    desired_count=2,
     launch_type="FARGATE",
     health_check_grace_period_seconds=60,
     network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
@@ -178,7 +146,7 @@ service = aws.ecs.Service(
     ),
     load_balancers=[
         aws.ecs.ServiceLoadBalancerArgs(
-            target_group_arn=target_group.arn,
+            target_group_arn=target_group_arn,
             container_name=PROJECT_NAME,
             container_port=80,
         )

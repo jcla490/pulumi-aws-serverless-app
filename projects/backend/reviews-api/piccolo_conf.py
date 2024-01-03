@@ -17,5 +17,5 @@ DB = PostgresEngine(
     }
 )
 
-# Register our Users table configuration found in /db
-APP_REGISTRY = AppRegistry(apps=["db.users_conf"])
+
+APP_REGISTRY = AppRegistry(apps=["db.reviews_conf"])

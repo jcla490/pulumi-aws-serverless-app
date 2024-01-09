@@ -1,7 +1,7 @@
 """
-users_api
+reviews_api
 
-Creates ECS tasks and services for a basic CRUD users service
+Creates ECS tasks and services for a basic CRUD reviews service
 """
 import json
 import os
@@ -118,7 +118,7 @@ task_definition = aws.ecs.TaskDefinition(
     cpu=256,
     memory=512,
     execution_role_arn=task_shared_execution_role_arn,
-    family="users_api",
+    family="reviews_api",
     network_mode="awsvpc",
     requires_compatibilities=["FARGATE"],
     runtime_platform=aws.ecs.TaskDefinitionRuntimePlatformArgs(
@@ -135,7 +135,7 @@ target_group = aws.lb.TargetGroup(
     vpc_id=vpc_id,
     port=80,
     health_check=aws.lb.TargetGroupHealthCheckArgs(
-        matcher="200-302", interval=300, path="/user/health"
+        matcher="200-302", interval=300, path="/review/health"
     ),
     opts=pulumi.ResourceOptions(parent=load_balancer),
 )
@@ -154,7 +154,7 @@ listerner_rule = aws.lb.ListenerRule(
     conditions=[
         aws.lb.ListenerRuleConditionArgs(
             path_pattern=aws.lb.ListenerRuleConditionPathPatternArgs(
-                values=["/user/*"],
+                values=["/review/*"],
             ),
         )
     ],

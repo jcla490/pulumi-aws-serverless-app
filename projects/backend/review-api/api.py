@@ -1,14 +1,14 @@
 from contextlib import asynccontextmanager
 from typing import Any, Generator
 
-from db.tables import Users
+from db.tables import Reviews
 from fastapi import APIRouter, FastAPI, status
 from piccolo.engine import engine_finder
 from piccolo_api.fastapi.endpoints import FastAPIKwargs, FastAPIWrapper, PiccoloCRUD
 from pydantic import BaseModel
 
 # Very important, load balancer/service will cry if not this path
-API_BASE_PATH = "/user"
+API_BASE_PATH = "/review"
 
 
 # These are startup and shutdown events called in our lifespan func
@@ -40,8 +40,8 @@ async def lifespan(app: FastAPI) -> Generator[None, Any, None]:
 
 # API init
 api = FastAPI(
-    title="User Service",
-    description="A basic users service for orangejuice.reviews",
+    title="Review Service",
+    description="A basic reviews service for orangejuice.reviews",
     openapi_url=API_BASE_PATH + "/openapi.json",
     docs_url=API_BASE_PATH + "/docs",
     redoc_url=API_BASE_PATH + "/redoc",
@@ -70,13 +70,13 @@ def get_health() -> Health:
     return Health
 
 
-# A very convenient CRUD wrapper for our Users table
+# A very convenient CRUD wrapper for our Reviews table
 FastAPIWrapper(
     "/",
     fastapi_app=router,
-    piccolo_crud=PiccoloCRUD(Users, read_only=False),
+    piccolo_crud=PiccoloCRUD(Reviews, read_only=False),
     fastapi_kwargs=FastAPIKwargs(
-        all_routes={"tags": ["User"]},
+        all_routes={"tags": ["Review"]},
     ),
 )
 

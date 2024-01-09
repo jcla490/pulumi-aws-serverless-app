@@ -1,17 +1,17 @@
 import datetime
 
-from piccolo.columns import UUID, Timestamptz, Varchar
+from piccolo.columns import UUID, SmallInt, Text, Timestamptz
 from piccolo.table import Table
 
 
-class Users(Table):
+class Reviews(Table):
     """
-    Users table for users-api service
+    Reviews table for reviews-api service
     """
 
     id = UUID(primary_key=True)
-    email = Varchar(unique=True, null=False)
-    first_name = Varchar()
-    last_name = Varchar()
+    title = Text(required=True)
+    rating = SmallInt(required=True)
+    body = Text()
     created_on = Timestamptz(default=datetime.datetime.now)
     modified_on = Timestamptz(auto_update=datetime.datetime.now)
